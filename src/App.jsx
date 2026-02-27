@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import ReminderChecker from './components/ReminderChecker';
 import Header from './components/Header';

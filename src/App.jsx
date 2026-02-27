@@ -21,6 +21,7 @@ const pageItems = [
   { id: 'internal-snowy', name: 'Yard Cards', path: INTERNAL_SNOWY_PATH, icon: 'M12 8v8m4-4H8m4-6a9 9 0 100 18 9 9 0 000-18z' }
 ];
 
+
 const getActivePage = (pathname) => {
   if (pathname === '/') return 'schedule';
   if (pathname === '/internal-snowy') return 'internal-snowy';

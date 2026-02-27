@@ -2,15 +2,9 @@ import React from 'react';
 
 const Header = () => {
   return (
-    <header className="bg-white shadow-sm">
-      <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center">
-              <h1 className="text-xl font-bold text-indigo-600">Planning Schedule</h1>
-            </div>
-          </div>
-        </div>
+    <header className="border-b border-slate-200 bg-white/90 backdrop-blur">
+      <div className="max-w-full px-4 py-3 sm:px-6 lg:px-8">
+        <div className="h-10" />
       </div>
     </header>
   );

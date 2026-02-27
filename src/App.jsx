@@ -21,6 +21,17 @@ const pageItems = [
   { id: 'internal-snowy', name: 'Yard Cards', path: INTERNAL_SNOWY_PATH, icon: 'M12 8v8m4-4H8m4-6a9 9 0 100 18 9 9 0 000-18z' }
 ];
 
+const normalizePath = (value = '') => {
+  if (!value) return '/';
+  return value.startsWith('/') ? value : `/${value}`;
+};
+
+const getRoutePath = () => {
+  const hashPath = normalizePath(window.location.hash.replace(/^#/, ''));
+  if (hashPath !== '/') return hashPath;
+  return normalizePath(window.location.pathname);
+};
+
 const getActivePage = (pathname) => {
   if (pathname === '/') return 'schedule';
   if (pathname === '/internal-snowy') return 'internal-snowy';
@@ -30,7 +41,7 @@ const getActivePage = (pathname) => {
 };
 
 function App() {
-  const [activePage, setActivePage] = useState(() => getActivePage(window.location.pathname));
+  const [activePage, setActivePage] = useState(() => getActivePage(getRoutePath()));
   const [scheduleData, setScheduleData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -67,24 +78,28 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const normalizedPage = getActivePage(window.location.pathname);
+    const normalizedPage = getActivePage(getRoutePath());
     const normalizedPath = pageItems.find((item) => item.id === normalizedPage)?.path;
 
-    if (window.location.pathname === '/' && normalizedPath) {
-      window.history.replaceState({}, '', normalizedPath);
+    if (!window.location.hash && normalizedPath) {
+      window.history.replaceState({}, '', `/#${normalizedPath}`);
     }
 
     const handleLocationChange = () => {
-      setActivePage(getActivePage(window.location.pathname));
+      setActivePage(getActivePage(getRoutePath()));
     };
 
+    window.addEventListener('hashchange', handleLocationChange);
     window.addEventListener('popstate', handleLocationChange);
-    return () => window.removeEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
   }, []);
 
   const navigateTo = (item) => {
-    if (window.location.pathname !== item.path) {
-      window.history.pushState({}, '', item.path);
+    if (getRoutePath() !== item.path) {
+      window.history.pushState({}, '', `/#${item.path}`);
     }
     setActivePage(item.id);
   };

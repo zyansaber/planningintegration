@@ -2459,11 +2459,17 @@ const CampervanSchedule = () => {
         </div>
       </div>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-semibold text-gray-800">Detailed Schedule Table</h3>
+          <p className="text-sm text-gray-500">
+            Spreadsheet-style editing area with horizontal sync scrolling for large column sets.
+          </p>
+        </div>
         <div
           ref={topScrollRef}
           onScroll={handleTopScroll}
-          className="overflow-x-scroll overflow-y-hidden"
+          className="overflow-x-scroll overflow-y-hidden rounded-md border border-gray-200 bg-white"
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <div style={{ width: scrollWidth || '100%' }} className="h-4" />
@@ -2471,7 +2477,7 @@ const CampervanSchedule = () => {
         <div
           ref={tableScrollRef}
           onScroll={handleTableScroll}
-          className="min-w-full overflow-x-scroll overflow-y-visible"
+          className="min-w-full overflow-x-scroll overflow-y-visible rounded-md border border-gray-200 bg-white"
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
         <table className="min-w-full text-xs text-left">
@@ -2546,7 +2552,7 @@ const CampervanSchedule = () => {
           </tbody>
         </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

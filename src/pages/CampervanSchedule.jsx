@@ -1640,12 +1640,12 @@ const CampervanSchedule = () => {
   }, [handleScheduleMouseMove, handleScheduleMouseUp]);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white shadow rounded-lg p-4">
+    <div className="space-y-8">
+      <section className="rounded-2xl border border-slate-200 bg-white px-5 py-5 md:px-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">Campervan Schedule</h2>
-            <p className="text-sm text-gray-500">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-900">Campervan Schedule Workspace</h2>
+            <p className="mt-1 text-sm text-slate-500">
               Fill in the table to auto-save rows to Firebase using the row number as the identifier.
             </p>
           </div>
@@ -1670,7 +1670,7 @@ const CampervanSchedule = () => {
             </button>
           </div>
         </div>
-        <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="mt-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex-1">
             <input
               type="text"
@@ -1680,20 +1680,20 @@ const CampervanSchedule = () => {
               className="w-full md:max-w-md rounded-md border-0 bg-gray-50 px-3 py-2 text-sm focus:outline-none focus:ring-0"
             />
           </div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs font-medium text-slate-500">
             Showing {filteredRows.length} of {rows.length} rows
           </div>
         </div>
         {statusMessage && (
-          <div className="mt-3 rounded-md bg-blue-50 text-blue-700 text-sm px-3 py-2">
+          <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-700">
             {statusMessage}
           </div>
         )}
-      </div>
+      </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
         <div className="space-y-6">
-          <div className="bg-white shadow rounded-lg p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">Monthly Order</h3>
@@ -1792,7 +1792,7 @@ const CampervanSchedule = () => {
                 </div>
               </div>
             </div>
-            <div className="mt-4 rounded-xl border border-gray-100 bg-gradient-to-br from-sky-50 via-white to-indigo-50 p-4">
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
               {orderBreakdownData.length === 0 ? (
                 <div className="text-sm text-gray-500">No monthly order data available yet.</div>
               ) : (
@@ -1847,7 +1847,7 @@ const CampervanSchedule = () => {
               )}
             </div>
 
-            <div className="mt-6 rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h4 className="text-base font-semibold text-gray-800">Production Pace Control</h4>
@@ -2143,14 +2143,14 @@ const CampervanSchedule = () => {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white shadow rounded-lg p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <div>
               <h3 className="text-lg font-semibold text-gray-800">Dealer Order</h3>
               <p className="text-sm text-gray-500">
                 Vehicles ordered by dealer, highlighting LDV and Ford model splits.
               </p>
             </div>
-            <div className="mt-4 rounded-xl border border-gray-100 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-4">
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-emerald-50/30 p-4">
               {dealerOrderMix.length === 0 ? (
                 <div className="text-sm text-gray-500">No dealer order data available yet.</div>
               ) : (
@@ -2184,7 +2184,7 @@ const CampervanSchedule = () => {
               )}
             </div>
             {dealerOrderMix.length > 0 && (
-              <div className="mt-4 overflow-x-auto rounded-xl border border-gray-100">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
                 <table className="min-w-full text-xs text-left">
                   <thead className="bg-gray-50 text-gray-600">
                     <tr>
@@ -2239,7 +2239,7 @@ const CampervanSchedule = () => {
                 </table>
               </div>
             )}
-            <div className="mt-6 rounded-xl border border-gray-100 bg-gradient-to-br from-amber-50 via-white to-rose-50 p-4">
+            <div className="mt-6 rounded-2xl border border-slate-200 bg-amber-50/30 p-4">
               <div className="flex flex-col gap-4">
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700">Order Type Share</h4>
@@ -2378,7 +2378,7 @@ const CampervanSchedule = () => {
             </div>
           </div>
           </div>
-          <div className="bg-white shadow rounded-lg p-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h3 className="text-lg font-semibold text-gray-800">Signed Orders Trend</h3>
@@ -2405,7 +2405,7 @@ const CampervanSchedule = () => {
                 </select>
               </div>
             </div>
-            <div className="mt-4 rounded-xl border border-gray-100 bg-gradient-to-br from-indigo-50 via-white to-sky-50 p-4">
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-indigo-50/30 p-4">
               {dealerChartData.length === 0 ? (
                 <div className="text-sm text-gray-500">
                   No signed order data available for this dealer yet.
@@ -2457,13 +2457,19 @@ const CampervanSchedule = () => {
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-semibold text-gray-800">Detailed Schedule Table</h3>
+          <p className="text-sm text-gray-500">
+            Spreadsheet-style editing area with horizontal sync scrolling for large column sets.
+          </p>
+        </div>
         <div
           ref={topScrollRef}
           onScroll={handleTopScroll}
-          className="overflow-x-scroll overflow-y-hidden"
+          className="overflow-x-scroll overflow-y-hidden rounded-md border border-gray-200 bg-white"
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
           <div style={{ width: scrollWidth || '100%' }} className="h-4" />
@@ -2471,7 +2477,7 @@ const CampervanSchedule = () => {
         <div
           ref={tableScrollRef}
           onScroll={handleTableScroll}
-          className="min-w-full overflow-x-scroll overflow-y-visible"
+          className="min-w-full overflow-x-scroll overflow-y-visible rounded-md border border-gray-200 bg-white"
           style={{ scrollbarGutter: 'stable both-edges' }}
         >
         <table className="min-w-full text-xs text-left">
@@ -2546,7 +2552,7 @@ const CampervanSchedule = () => {
           </tbody>
         </table>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

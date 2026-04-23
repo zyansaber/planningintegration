@@ -3,6 +3,7 @@ import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 import { fetchCalendarData } from '../data/scheduleData';
 
 const StockLevelAnalysis = ({ data }) => {
+  const TREND_WINDOW_DAYS = 28;
   const [calendarData, setCalendarData] = useState({});
   const [loading, setLoading] = useState(true);
 
@@ -180,9 +181,9 @@ const StockLevelAnalysis = ({ data }) => {
       }
     });
     
-    // Chart shows today + 1 month only
+    // Chart shows a rolling 28-day window (inclusive of today)
     const endDate = new Date(today);
-    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(endDate.getDate() + (TREND_WINDOW_DAYS - 1));
     
     console.log('Chart date range:', {
       today: today.toISOString().split('T')[0],
@@ -199,9 +200,8 @@ const StockLevelAnalysis = ({ data }) => {
       const dateStr = currentDate.toISOString().split('T')[0]; // YYYY-MM-DD
       
       // Subtract vans based on Calendar data for this specific date (daily reduction)
-      if (filteredCalendar[dateStr]) {
-        currentStock -= filteredCalendar[dateStr];
-      }
+      const departures = Number(filteredCalendar[dateStr]) || 0;
+      currentStock -= departures;
       
       // Add vans based on Estimate Semi Received Date (arrivals increase stock)
       const vansReceived = estimateDates[dateStr] || 0;
@@ -218,7 +218,8 @@ const StockLevelAnalysis = ({ data }) => {
           year: currentDate.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
         }),
         semivanstock: currentStock,
-        estimateArrivals: vansReceived // This will be 0 for dates without estimates
+        estimateArrivals: vansReceived, // This will be 0 for dates without estimates
+        departures
       });
       
       // Move to next day
@@ -359,7 +360,7 @@ const StockLevelAnalysis = ({ data }) => {
       {/* Trend Chart */}
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
-          Semi Van Stock Trend (Next 30 Days)
+          Semi Van Stock Trend (Next 28 Days)
         </h2>
         <div className="mb-4">
           <div className="text-sm text-gray-600">
@@ -369,7 +370,7 @@ const StockLevelAnalysis = ({ data }) => {
             Chart period: <span className="font-semibold text-green-600">
               {today.toLocaleDateString('en-US')} - {(() => {
                 const nextMonth = new Date(today);
-                nextMonth.setMonth(nextMonth.getMonth() + 1);
+                nextMonth.setDate(nextMonth.getDate() + (TREND_WINDOW_DAYS - 1));
                 return nextMonth.toLocaleDateString('en-US');
               })()}
             </span>
@@ -383,12 +384,19 @@ const StockLevelAnalysis = ({ data }) => {
         ) : (
           <div className="h-96">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={combinedChartData.filter((_, index) => index % Math.max(1, Math.floor(combinedChartData.length / 30)) === 0)}>
+              <ComposedChart
+                data={combinedChartData.filter((_, index) => index % Math.max(1, Math.floor(combinedChartData.length / 30)) === 0)}
+                barGap={-20}
+              >
                 <defs>
                   <linearGradient id="stockGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                     <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                   </linearGradient>
+                  <pattern id="departureStripePattern" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)">
+                    <rect width="6" height="6" fill="#059669" fillOpacity="0.12" />
+                    <line x1="0" y1="0" x2="0" y2="6" stroke="#065f46" strokeWidth="2" strokeOpacity="0.45" />
+                  </pattern>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
                 <XAxis 
@@ -435,6 +443,15 @@ const StockLevelAnalysis = ({ data }) => {
                   fill="#10b981"
                   fillOpacity={0.7}
                   name="Expected Arrivals"
+                  barSize={14}
+                  radius={[2, 2, 0, 0]}
+                />
+                <Bar
+                  yAxisId="arrivals"
+                  dataKey="departures"
+                  fill="url(#departureStripePattern)"
+                  name="Departures (Shaded)"
+                  barSize={14}
                   radius={[2, 2, 0, 0]}
                 />
                 <Line 

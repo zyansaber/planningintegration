@@ -1,17 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { fetchCalendarData } from '../data/scheduleData';
+import {
+  fetchCalendarData,
+  fetchMonthlySemiInventoryTrend,
+  fetchPlanningTarget,
+  fetchProductionDailyAverage
+} from '../data/scheduleData';
 
 const StockLevelAnalysis = ({ data }) => {
   const [calendarData, setCalendarData] = useState({});
+  const [monthlySemiInventoryTrend, setMonthlySemiInventoryTrend] = useState({});
+  const [productionDailyAverage, setProductionDailyAverage] = useState({});
+  const [planningTarget, setPlanningTarget] = useState({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadCalendarData = async () => {
       try {
         const calendar = await fetchCalendarData();
-        console.log('Calendar data loaded:', calendar);
+        const [monthlyTrend, dailyAverage, targetData] = await Promise.all([
+          fetchMonthlySemiInventoryTrend(),
+          fetchProductionDailyAverage(),
+          fetchPlanningTarget()
+        ]);
         setCalendarData(calendar || {});
+        setMonthlySemiInventoryTrend(monthlyTrend || {});
+        setProductionDailyAverage(dailyAverage || {});
+        setPlanningTarget(targetData || {});
       } catch (error) {
         console.error("Error loading calendar data:", error);
       } finally {
@@ -23,6 +38,241 @@ const StockLevelAnalysis = ({ data }) => {
 
   // Get today's date
   const today = new Date();
+
+  const toMonthKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+  const normalizeToNumber = (value) => {
+    const numberValue = Number(value);
+    return Number.isFinite(numberValue) ? numberValue : 0;
+  };
+
+  const normalizeMonthLikeLabel = (label) => {
+    if (!label) return null;
+    const value = String(label).trim();
+    if (/^\d{4}-\d{2}$/.test(value)) return value;
+    const maybeDate = new Date(value);
+    if (!Number.isNaN(maybeDate.getTime())) {
+      return toMonthKey(maybeDate);
+    }
+    const cleaned = value.replace(/[./]/g, '-');
+    if (/^\d{4}-\d{1,2}$/.test(cleaned)) {
+      const [year, month] = cleaned.split('-');
+      return `${year}-${month.padStart(2, '0')}`;
+    }
+    return null;
+  };
+
+  const normalizeDateLikeValue = (value) => {
+    if (!value) return null;
+    const raw = String(value).trim();
+    if (!raw) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return new Date(`${raw}T00:00:00`);
+    const fromSlash = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (fromSlash) {
+      const [, day, month, year] = fromSlash;
+      return new Date(`${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00`);
+    }
+    const fromIso = new Date(raw);
+    return Number.isNaN(fromIso.getTime()) ? null : fromIso;
+  };
+
+  const flattenNumericEntries = (node) => {
+    const results = [];
+
+    const visit = (value, keyHint = '') => {
+      if (Array.isArray(value)) {
+        value.forEach((item, index) => visit(item, `${keyHint}${index}`));
+        return;
+      }
+
+      if (value && typeof value === 'object') {
+        Object.entries(value).forEach(([childKey, childValue]) => {
+          const numericDirect = Number(childValue);
+          if (Number.isFinite(numericDirect)) {
+            results.push({ key: childKey, value: numericDirect });
+            return;
+          }
+
+          if (childValue && typeof childValue === 'object') {
+            const dateCandidate =
+              childValue.date ||
+              childValue.day ||
+              childValue.datetime ||
+              childValue.timestamp ||
+              childValue.key ||
+              childValue.month ||
+              childValue.label ||
+              childKey;
+            const valueCandidate =
+              childValue.value ??
+              childValue.avg ??
+              childValue.average ??
+              childValue.quantity ??
+              childValue.count;
+            if (Number.isFinite(Number(valueCandidate))) {
+              results.push({ key: dateCandidate, value: Number(valueCandidate) });
+            }
+            visit(childValue, childKey);
+          }
+        });
+        return;
+      }
+
+      const numericLeaf = Number(value);
+      if (Number.isFinite(numericLeaf)) {
+        results.push({ key: keyHint, value: numericLeaf });
+      }
+    };
+
+    visit(node);
+    return results;
+  };
+
+  const getProductionDailyAverageMeta = () => {
+    const dailyRows = flattenNumericEntries(productionDailyAverage)
+      .map((entry) => {
+        const dateValue = normalizeDateLikeValue(entry.key);
+        if (!dateValue) return null;
+        return {
+          date: dateValue,
+          value: entry.value
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.date - b.date);
+
+    if (dailyRows.length === 0) {
+      return {
+        lastDate: null,
+        lastMonthKey: null,
+        lastMonthCoverageRatio: 1,
+        monthlyProductionEquivalent: 0
+      };
+    }
+
+    const lastDate = dailyRows[dailyRows.length - 1].date;
+    const monthStart = new Date(lastDate.getFullYear(), lastDate.getMonth(), 1);
+    const monthEnd = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 0);
+    const inclusiveDays = Math.floor((lastDate - monthStart) / (1000 * 60 * 60 * 24)) + 1;
+    const daysInMonth = monthEnd.getDate();
+    const lastMonthRows = dailyRows.filter((item) => toMonthKey(item.date) === toMonthKey(lastDate));
+    const avgDailyProduction =
+      lastMonthRows.length > 0
+        ? lastMonthRows.reduce((sum, item) => sum + normalizeToNumber(item.value), 0) / lastMonthRows.length
+        : 0;
+
+    return {
+      lastDate,
+      lastMonthKey: toMonthKey(lastDate),
+      lastMonthCoverageRatio: Math.min(1, Math.max(0, inclusiveDays / daysInMonth)),
+      monthlyProductionEquivalent: avgDailyProduction * daysInMonth
+    };
+  };
+
+  const getDomesticFactoryGap = () => {
+    const flattenTargets = flattenNumericEntries(planningTarget);
+    const domesticTargetEntry = flattenTargets.find((entry) =>
+      String(entry.key).includes('国内指标')
+    );
+    const domesticCountEntry = flattenTargets.find((entry) =>
+      String(entry.key).includes('国内指标的数量')
+    );
+
+    const leaveFactoryTargetRaw =
+      planningTarget?.['离开工厂'] ||
+      planningTarget?.leaveFactory ||
+      planningTarget?.factoryLeave ||
+      planningTarget?.outOfFactory ||
+      {};
+    const leaveFactoryTargets = flattenNumericEntries(leaveFactoryTargetRaw);
+    const leaveFactoryDomesticTarget = leaveFactoryTargets.find((entry) =>
+      String(entry.key).includes('国内指标')
+    );
+    const leaveFactoryDomesticCount = leaveFactoryTargets.find((entry) =>
+      String(entry.key).includes('国内指标的数量')
+    );
+
+    const targetValue = normalizeToNumber(
+      leaveFactoryDomesticTarget?.value ?? domesticTargetEntry?.value
+    );
+    const actualValue = normalizeToNumber(
+      leaveFactoryDomesticCount?.value ?? domesticCountEntry?.value
+    );
+
+    return Math.max(0, targetValue - actualValue);
+  };
+
+  const getAdjustedMonthlySemiInventoryTrend = () => {
+    const entries = Object.entries(monthlySemiInventoryTrend || {})
+      .map(([key, value]) => {
+        if (typeof value === 'number') {
+          const monthKey = normalizeMonthLikeLabel(key);
+          if (!monthKey) return null;
+          return { monthKey, value };
+        }
+
+        if (value && typeof value === 'object') {
+          const monthKey = normalizeMonthLikeLabel(value.month || value.date || key);
+          const resolvedValue =
+            value.value ??
+            value.inventory ??
+            value.total ??
+            value.count;
+          if (!monthKey || !Number.isFinite(Number(resolvedValue))) return null;
+          return { monthKey, value: Number(resolvedValue) };
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+
+    if (entries.length === 0) return [];
+
+    const productionMeta = getProductionDailyAverageMeta();
+    const domesticGap = getDomesticFactoryGap();
+    const result = entries.map((entry) => ({
+      month: entry.monthKey,
+      monthLabel: new Date(`${entry.monthKey}-01T00:00:00`).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric'
+      }),
+      baseValue: normalizeToNumber(entry.value),
+      exactValue: 0,
+      projectedValue: 0,
+      domesticGap,
+      isPreciseMonth: false
+    }));
+
+    if (!productionMeta.lastMonthKey) {
+      return result.map((item) => ({
+        ...item,
+        projectedValue: item.baseValue
+      }));
+    }
+
+    return result.map((item) => {
+      if (item.month !== productionMeta.lastMonthKey) {
+        return {
+          ...item,
+          projectedValue: item.baseValue
+        };
+      }
+
+      const exactValue = item.baseValue * productionMeta.lastMonthCoverageRatio;
+      const residualValue = Math.max(0, item.baseValue - exactValue);
+      const monthExtensionValue =
+        domesticGap > 0
+          ? Math.max(1, domesticGap / Math.max(productionMeta.monthlyProductionEquivalent, 1))
+          : 0;
+
+      return {
+        ...item,
+        exactValue,
+        projectedValue: residualValue + monthExtensionValue,
+        isPreciseMonth: true
+      };
+    });
+  };
 
   // Filter calendar data to only show valid daily entries from today onwards (for stock trend)
   const getFilteredCalendarData = () => {
@@ -286,6 +536,8 @@ const StockLevelAnalysis = ({ data }) => {
   const monthlyProductionData = getMonthlyProductionData();
   const combinedChartData = getCombinedChartData();
   const vanOnSeaData = getVanOnSeaData();
+  const adjustedMonthlySemiInventoryTrend = getAdjustedMonthlySemiInventoryTrend();
+  const productionDailyAverageMeta = getProductionDailyAverageMeta();
 
   if (loading) {
     return (
@@ -357,6 +609,57 @@ const StockLevelAnalysis = ({ data }) => {
       </div>
 
       {/* Trend Chart */}
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">
+          Monthly Semi Inventory Trend
+        </h2>
+        <div className="mb-4 text-sm text-gray-600 space-y-1">
+          <div>
+            Precision aligned to <span className="font-semibold text-indigo-700">production-daily-average</span>{' '}
+            last day:{' '}
+            <span className="font-semibold">
+              {productionDailyAverageMeta.lastDate
+                ? productionDailyAverageMeta.lastDate.toLocaleDateString('en-US')
+                : 'Not available'}
+            </span>
+          </div>
+          <div>
+            Hatched segment = precise monthly portion; solid segment = carry-over/projected balance.
+          </div>
+        </div>
+
+        {adjustedMonthlySemiInventoryTrend.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">
+            No monthly semi inventory trend data available
+          </div>
+        ) : (
+          <div className="h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={adjustedMonthlySemiInventoryTrend}>
+                <defs>
+                  <pattern id="preciseHatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(135)">
+                    <line x1="0" y1="0" x2="0" y2="8" stroke="#1d4ed8" strokeWidth="2" />
+                  </pattern>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="monthLabel" tick={{ fontSize: 11, fill: '#4b5563' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#4b5563' }} />
+                <Tooltip
+                  formatter={(value, name) => {
+                    if (name === 'Precise (Hatched)') return [Number(value).toFixed(2), name];
+                    if (name === 'Projected / Extension') return [Number(value).toFixed(2), name];
+                    return [value, name];
+                  }}
+                />
+                <Legend />
+                <Bar dataKey="exactValue" stackId="inventory" fill="url(#preciseHatch)" stroke="#1d4ed8" name="Precise (Hatched)" />
+                <Bar dataKey="projectedValue" stackId="inventory" fill="#93c5fd" name="Projected / Extension" />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">
           Semi Van Stock Trend (Next 30 Days)

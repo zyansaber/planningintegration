@@ -163,6 +163,38 @@ export const fetchCalendarData = async () => {
   }
 };
 
+const fetchPathData = async (path) => {
+  try {
+    const dataRef = ref(database, path);
+    return new Promise((resolve, reject) => {
+      get(dataRef)
+        .then((snapshot) => {
+          if (snapshot.exists()) {
+            resolve(snapshot.val());
+          } else {
+            resolve({});
+          }
+        })
+        .catch((error) => {
+          console.error(`Error fetching ${path}:`, error);
+          reject(error);
+        });
+    });
+  } catch (error) {
+    console.error(`Error setting up ${path} fetch:`, error);
+    throw error;
+  }
+};
+
+export const fetchMonthlySemiInventoryTrend = async () =>
+  fetchPathData('planningintegration/monthly-semi-inventory-trend');
+
+export const fetchProductionDailyAverage = async () =>
+  fetchPathData('production-daily-average');
+
+export const fetchPlanningTarget = async () =>
+  fetchPathData('planningintegration/target');
+
 // Mock data structure for development (will be replaced by Firebase data in production)
 export const mockScheduleData = [
   {

@@ -23,6 +23,9 @@ const Reallocation = ({ data }) => {
   const [reallocationRequests, setReallocationRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [globalMessage, setGlobalMessage] = useState('');
+  const [requestMode, setRequestMode] = useState('reallocation');
+  const [deleteTicketChassis, setDeleteTicketChassis] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
   const [trendFilter, setTrendFilter] = useState('all'); // 'all' | 'snowy'
   const [campervanScheduleRows, setCampervanScheduleRows] = useState([]);
   // ====== Charts Data (Snowy Stock not finished + Prefix distribution + 10-week trend) ======
@@ -272,6 +275,10 @@ const repetitionBadgeStyles = {
       }
       
       // Count chassis being moved from original dealer
+      if (request.requestType === 'delete') {
+        return;
+      }
+
       if (request.originalDealer) {
         if (!dealerStats[request.originalDealer]) {
           dealerStats[request.originalDealer] = { moved_from: 0, moved_to: 0 };
@@ -498,6 +505,78 @@ const repetitionBadgeStyles = {
     }
   };
 
+  const handleDeleteTicketSubmit = async () => {
+    const chassisNumbers = deleteTicketChassis
+      .split(/[\n,;\s]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const uniqueChassisNumbers = Array.from(new Set(chassisNumbers));
+    const trimmedReason = deleteReason.trim();
+
+    if (uniqueChassisNumbers.length === 0 || !trimmedReason) {
+      setGlobalMessage('Please enter at least one chassis number and a delete reason');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const ticketRef = push(ref(database, 'reallocationDeleteTickets'));
+      const ticketId = ticketRef.key;
+      const submitTime = getMelbourneTime();
+
+      await set(ticketRef, {
+        ticketId,
+        chassisNumbers: uniqueChassisNumbers,
+        deleteReason: trimmedReason,
+        submitTime,
+        status: 'pending'
+      });
+
+      await Promise.all(uniqueChassisNumbers.map(async (chassis) => {
+        const requestRef = push(ref(database, `reallocation/${chassis}`));
+        await set(requestRef, {
+          requestType: 'delete',
+          ticketId,
+          deleteReason: trimmedReason,
+          submitTime,
+          status: 'pending'
+        });
+      }));
+
+      setGlobalMessage(`Successfully submitted delete ticket for ${uniqueChassisNumbers.length} chassis number(s)!`);
+      setDeleteTicketChassis('');
+      setDeleteReason('');
+      await loadReallocationRequests();
+    } catch (error) {
+      console.error('❌ Error submitting delete ticket:', error);
+      setGlobalMessage('Error submitting delete ticket. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkDeleteTicketDone = async (ticketId) => {
+    try {
+      const pendingTicketRequests = reallocationRequests.filter((request) =>
+        request.requestType === 'delete' &&
+        request.ticketId === ticketId &&
+        request.status !== 'completed'
+      );
+
+      await Promise.all(pendingTicketRequests.map((request) =>
+        set(ref(database, `reallocation/${request.chassisNumber}/${request.id}/status`), 'completed')
+      ));
+
+      await set(ref(database, `reallocationDeleteTickets/${ticketId}/status`), 'completed');
+      await loadReallocationRequests();
+      setGlobalMessage('Delete ticket marked as completed');
+    } catch (error) {
+      console.error('❌ Error marking delete ticket as done:', error);
+      setGlobalMessage('Error updating delete ticket. Please try again.');
+    }
+  };
+
   const handleMarkDone = async (chassisNumber, requestId) => {
     try {
       const reallocationRef = ref(database, `reallocation/${chassisNumber}/${requestId}/status`);
@@ -593,15 +672,17 @@ const repetitionBadgeStyles = {
   });
 
   const downloadCSV = () => {
-    const headers = ['Chassis', 'From Dealer', 'To Dealer', 'Van Status', 'Signed Plans', 'Submit Time', 'Request Status', 'Issue Type', 'Issue Time'];
+    const headers = ['Type', 'Ticket ID', 'Chassis', 'From Dealer', 'To Dealer', 'Van Status', 'Delete Reason', 'Submit Time', 'Request Status', 'Issue Type', 'Issue Time'];
     const csvData = [
       headers,
       ...filteredRequests.map(request => [
+        request.requestType === 'delete' ? 'Delete' : 'Reallocation',
+        request.ticketId || 'N/A',
         request.chassisNumber,
-        request.originalDealer,
-        request.reallocatedTo,
+        request.originalDealer || 'N/A',
+        request.reallocatedTo || 'N/A',
         request.status === 'completed' ? 'Done' : request.status,
-        request.signedPlansReceived || 'N/A',
+        request.deleteReason || 'N/A',
         request.submitTime,
         request.status === 'completed' ? 'Completed' : 'Pending',
         request.issue?.type || 'None',
@@ -674,7 +755,31 @@ const repetitionBadgeStyles = {
         )}
       </div>
 
-      {/* Reallocation Form */}
+      <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setRequestMode('reallocation')} className={`px-3 py-1 rounded text-sm ${requestMode === 'reallocation' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Reallocation Request</button>
+          <button onClick={() => setRequestMode('delete')} className={`px-3 py-1 rounded text-sm ${requestMode === 'delete' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700'}`}>Delete Ticket</button>
+        </div>
+      </div>
+
+      {requestMode === 'delete' && (
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+          <h3 className="text-lg font-semibold text-gray-700 mb-3">Submit Delete Ticket</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Batch Chassis Numbers</label>
+              <textarea value={deleteTicketChassis} onChange={(e) => setDeleteTicketChassis(e.target.value)} rows={6} className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-red-500" placeholder="One chassis number per line, or separate by comma/space" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Delete Reason</label>
+              <textarea value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} rows={6} className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-red-500" placeholder="Enter the reason for deleting these chassis numbers" />
+            </div>
+          </div>
+          <button onClick={handleDeleteTicketSubmit} disabled={loading} className="mt-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white px-6 py-2 rounded-md font-medium">{loading ? 'Submitting...' : 'Submit Delete Ticket'}</button>
+        </div>
+      )}
+
+      {requestMode === 'reallocation' && (
       <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-semibold text-gray-700">Submit Reallocation Request</h3>
@@ -829,6 +934,7 @@ const repetitionBadgeStyles = {
           )}
         </div>
       </div>
+      )}
 
 {/* ===== Charts Section ===== */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
@@ -944,6 +1050,12 @@ const repetitionBadgeStyles = {
                     Chassis
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Type
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                    Ticket
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     From
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
@@ -953,7 +1065,7 @@ const repetitionBadgeStyles = {
                     Status
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                    Signed Plans
+                    Delete Reason
                   </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">
                     Submit Time
@@ -986,10 +1098,16 @@ const repetitionBadgeStyles = {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500">
-                        {request.originalDealer}
+                        {request.requestType === 'delete' ? 'Delete' : 'Reallocation'}
+                      </td>
+                      <td className="px-4 py-2 text-xs text-gray-500">
+                        {request.ticketId ? request.ticketId.slice(-6) : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-500">
+                        {request.originalDealer || '-'}
                       </td>
                       <td className="px-4 py-2 text-sm text-black font-bold">
-                        {request.reallocatedTo}
+                        {request.reallocatedTo || '-'}
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500">
                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -1002,7 +1120,7 @@ const repetitionBadgeStyles = {
                           {request.status === 'completed' ? 'Done' : request.status}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-sm text-gray-500">{request.signedPlansReceived || 'N/A'}</td>
+                      <td className="px-4 py-2 text-sm text-gray-500 max-w-xs">{request.deleteReason || '-'}</td>
                       <td className="px-4 py-2 text-sm text-gray-500">{request.submitTime}</td>
                       <td className="px-4 py-2 text-sm text-gray-500">
                         {request.issue ? (
@@ -1035,12 +1153,22 @@ const repetitionBadgeStyles = {
                       </td>
                       <td className="px-4 py-2 text-sm text-gray-500">
                         {request.status !== 'completed' ? (
-                          <button
-                            onClick={() => handleMarkDone(request.chassisNumber, request.id)}
-                            className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium"
-                          >
-                            Done
-                          </button>
+                          <div className="flex flex-wrap gap-1">
+                            <button
+                              onClick={() => handleMarkDone(request.chassisNumber, request.id)}
+                              className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs font-medium"
+                            >
+                              Done
+                            </button>
+                            {request.requestType === 'delete' && request.ticketId && (
+                              <button
+                                onClick={() => handleMarkDeleteTicketDone(request.ticketId)}
+                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs font-medium"
+                              >
+                                Done Ticket
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-green-600 text-xs font-medium">✓ Completed</span>
                         )}

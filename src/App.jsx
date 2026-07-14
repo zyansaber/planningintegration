@@ -16,7 +16,7 @@ const pageItems = [
   { id: 'schedule', name: 'Schedule', path: '/schedule', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
   { id: 'stock-level', name: 'Semi Van Stock', path: '/stock-level', icon: 'M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z' },
   { id: 'van-tracking', name: 'Date Track', path: '/van-tracking', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-  { id: 'reallocation', name: 'Reallocation', path: '/reallocation', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
+  { id: 'reallocation', name: 'Requisition Status', path: '/requsition-status', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
   { id: 'campervan-schedule', name: 'Campervan', path: '/campervan-schedule', icon: 'M3 7h18M3 12h18M3 17h18M5 5h14a2 2 0 012 2v12a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z' },
   { id: 'internal-snowy', name: 'Yard Cards', path: INTERNAL_SNOWY_PATH, icon: 'M12 8v8m4-4H8m4-6a9 9 0 100 18 9 9 0 000-18z' }
 ];
@@ -25,6 +25,7 @@ const pageItems = [
 const getActivePage = (pathname) => {
   if (pathname === '/') return 'schedule';
   if (pathname === '/internal-snowy') return 'internal-snowy';
+  if (pathname === '/reallocation' || pathname === '/requsition-request') return 'reallocation';
 
   const page = pageItems.find((item) => item.path === pathname);
   return page?.id ?? 'schedule';
